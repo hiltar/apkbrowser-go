@@ -31,7 +31,12 @@ jobs:
         go-version: 'stable'
     
     - name: Tidy Modules
-      run: go mod init apkbrowser-go && go mod tidy && go mod verify
+      run: |
+        if [ ! -f go.mod ]; then
+          go mod init apkbrowser
+        fi
+        go mod tidy
+        go mod verify
 
     - name: Download and Install UPX
       run: |
@@ -46,17 +51,18 @@ jobs:
         CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
         go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
         -o updater-arm ./cmd/updater
-
+        
         CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
         go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
         -o server-arm ./cmd/server
 
     - name: Build AMD64
       run: |
-        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+        # FIX 2: Changed GOARCH=arm64 to amd64 for the updater binary
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
         go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
         -o updater ./cmd/updater
-
+        
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
         go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
         -o server ./cmd/server
