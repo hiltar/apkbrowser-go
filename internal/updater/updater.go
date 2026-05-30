@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,12 +22,21 @@ import (
 
 // Run starts the concurrent database update process for a specific branch.
 func Run(cfg *config.Config, branch string, force bool) {
+	// Automatically create the database directory if it doesn't exist
+	if err := os.MkdirAll(cfg.Database.Path, 0755); err != nil {
+		log.Fatalf("Failed to create database directory %s: %v", cfg.Database.Path, err)
+	}
+
 	dbPath := filepath.Join(cfg.Database.Path, fmt.Sprintf("aports-%s.db", branch))
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
 	defer db.Close()
+
+	// SQLite only supports one concurrent writer. 
+	// This forces Go to queue the goroutines safely, preventing "database is locked" errors.
+	db.SetMaxOpenConns(1)
 
 	// Optimize SQLite for bulk inserts
 	db.Exec("PRAGMA synchronous = OFF;")
@@ -113,6 +123,11 @@ func processRepo(db *sql.DB, cfg *config.Config, branch, repo, arch string, forc
 
 func parseAndInsert(db *sql.DB, cfg *config.Config, branch, repo, arch string, data []byte, version string) {
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+	
+	// Increase buffer size just in case of unusually long lines in APKINDEX
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
 	buffer := make(map[string]interface{})
 	var packages []map[string]interface{}
 
@@ -129,6 +144,7 @@ func parseAndInsert(db *sql.DB, cfg *config.Config, branch, repo, arch string, d
 		if len(parts) == 2 {
 			key := parts[0]
 			value := parts[1]
+			// Depends, Provides and Install-if are multi-value fields
 			if key == "D" || key == "p" || key == "i" {
 				buffer[key] = strings.Split(value, " ")
 			} else {
@@ -137,41 +153,81 @@ func parseAndInsert(db *sql.DB, cfg *config.Config, branch, repo, arch string, d
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		log.Printf("[%s/%s] Scanner error: %v", repo, arch, err)
+		return
+	}
+
 	tx, err := db.Begin()
 	if err != nil {
-		log.Printf("Transaction begin error: %v", err)
+		log.Printf("[%s/%s] Transaction begin error: %v", repo, arch, err)
 		return
 	}
 	defer tx.Rollback()
 
-	// Clear old data for this repo/arch
+	// Clear old data for this repo/arch before inserting new data
 	tx.Exec("DELETE FROM files WHERE pid IN (SELECT id FROM packages WHERE repo = ? AND arch = ?)", repo, arch)
 	tx.Exec("DELETE FROM depends WHERE pid IN (SELECT id FROM packages WHERE repo = ? AND arch = ?)", repo, arch)
 	tx.Exec("DELETE FROM provides WHERE pid IN (SELECT id FROM packages WHERE repo = ? AND arch = ?)", repo, arch)
 	tx.Exec("DELETE FROM install_if WHERE pid IN (SELECT id FROM packages WHERE repo = ? AND arch = ?)", repo, arch)
 	tx.Exec("DELETE FROM packages WHERE repo = ? AND arch = ?", repo, arch)
 
-	stmtPkg, _ := tx.Prepare(`INSERT INTO packages (name, version, description, url, license, arch, repo, checksum, size, installed_size, origin, maintainer, build_time, commit, provider_priority) 
+	// Prepare statements with strict error checking to prevent nil pointer panics
+        	stmtPkg, err := tx.Prepare(`INSERT INTO packages (name, version, description, url, license, arch, repo, checksum, size, installed_size, origin, maintainer, build_time, "commit", provider_priority) 
 	                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	stmtFile, _ := tx.Prepare(`INSERT INTO files (file, path, pid) VALUES (?, ?, ?)`)
-	stmtDep, _ := tx.Prepare(`INSERT INTO depends (name, version, operator, pid) VALUES (?, ?, ?, ?)`)
-	stmtProv, _ := tx.Prepare(`INSERT INTO provides (name, version, operator, pid) VALUES (?, ?, ?, ?)`)
-	stmtIif, _ := tx.Prepare(`INSERT INTO install_if (name, version, operator, pid) VALUES (?, ?, ?, ?)`)
+
+	if err != nil {
+		log.Printf("[%s/%s] Failed to prepare stmtPkg: %v", repo, arch, err)
+		return
+	}
+	defer stmtPkg.Close()
+
+	stmtFile, err := tx.Prepare(`INSERT INTO files (file, path, pid) VALUES (?, ?, ?)`)
+	if err != nil {
+		log.Printf("[%s/%s] Failed to prepare stmtFile: %v", repo, arch, err)
+		return
+	}
+	defer stmtFile.Close()
+
+	stmtDep, err := tx.Prepare(`INSERT INTO depends (name, version, operator, pid) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		log.Printf("[%s/%s] Failed to prepare stmtDep: %v", repo, arch, err)
+		return
+	}
+	defer stmtDep.Close()
+
+	stmtProv, err := tx.Prepare(`INSERT INTO provides (name, version, operator, pid) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		log.Printf("[%s/%s] Failed to prepare stmtProv: %v", repo, arch, err)
+		return
+	}
+	defer stmtProv.Close()
+
+	stmtIif, err := tx.Prepare(`INSERT INTO install_if (name, version, operator, pid) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		log.Printf("[%s/%s] Failed to prepare stmtIif: %v", repo, arch, err)
+		return
+	}
+	defer stmtIif.Close()
 
 	for _, pkg := range packages {
-		name, _ := pkg["P"].(string)
-		ver, _ := pkg["V"].(string)
-		
 		var maintainerID sql.NullInt64
 		if m, ok := pkg["m"].(string); ok && m != "" {
 			maintainerID = database.EnsureMaintainerExists(tx, m)
 		}
 
+		// Ensure 'k' (provider_priority) is nil if missing, matching Python's behavior
+		kVal := pkg["k"]
+		if kVal == "" {
+			kVal = nil
+		}
+
 		res, err := stmtPkg.Exec(
-			name, ver, pkg["T"], pkg["U"], pkg["L"], pkg["A"], repo, pkg["C"], 
-			pkg["S"], pkg["I"], pkg["o"], maintainerID, pkg["t"], pkg["c"], pkg["k"],
+			pkg["P"], pkg["V"], pkg["T"], pkg["U"], pkg["L"], arch, repo, pkg["C"],
+			pkg["S"], pkg["I"], pkg["o"], maintainerID, pkg["t"], pkg["c"], kVal,
 		)
 		if err != nil {
+			log.Printf("[%s/%s] Failed to insert package %s: %v", repo, arch, pkg["P"], err)
 			continue
 		}
 		pid, _ := res.LastInsertId()
@@ -182,7 +238,10 @@ func parseAndInsert(db *sql.DB, cfg *config.Config, branch, repo, arch string, d
 		insertRelations(stmtIif, pkg["i"], pid)
 
 		// Fetch and insert file list from the actual .apk file
+		name, _ := pkg["P"].(string)
+		ver, _ := pkg["V"].(string)
 		apkURL := fmt.Sprintf("%s/%s/%s/%s/%s-%s.apk", cfg.Repository.URL, branch, repo, arch, name, ver)
+		
 		files, err := getFileList(apkURL)
 		if err == nil {
 			for _, f := range files {
@@ -193,8 +252,16 @@ func parseAndInsert(db *sql.DB, cfg *config.Config, branch, repo, arch string, d
 		}
 	}
 
-	tx.Exec("INSERT OR REPLACE INTO repoversion (version, repo, arch) VALUES (?, ?, ?)", version, repo, arch)
-	tx.Commit()
+	_, err = tx.Exec("INSERT OR REPLACE INTO repoversion (version, repo, arch) VALUES (?, ?, ?)", version, repo, arch)
+	if err != nil {
+		log.Printf("[%s/%s] Failed to update repoversion: %v", repo, arch, err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Printf("[%s/%s] Transaction commit error: %v", repo, arch, err)
+		return
+	}
 	log.Printf("[%s/%s] Successfully inserted %d packages", repo, arch, len(packages))
 }
 
@@ -227,6 +294,10 @@ func getFileList(url string) ([]string, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
 
 	var files []string
 	// Alpine .apk files are often concatenated gzip streams. We must loop until EOF.

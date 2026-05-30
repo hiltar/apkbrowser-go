@@ -2,46 +2,61 @@
 
 <h2>Contents Index</h2>
 
-<form method="GET" action="/contents" class="search-form">
-    <input type="text" name="file" value="{{.form.file}}" placeholder="File name (e.g. nginx.conf)">
-    <input type="text" name="path" value="{{.form.path}}" placeholder="Path (e.g. /etc/nginx)">
-    <input type="text" name="name" value="{{.form.name}}" placeholder="Package name">
-    
-    <select name="branch">
-        {{range .branches}}
-        <option value="{{.}}" {{if eq . $.form.branch}}selected{{end}}>{{.}}</option>
-        {{end}}
-    </select>
+<div class="search-box">
+    <form method="GET" action="/contents" class="pure-form">
+        <div class="pure-g" style="gap: 1rem;">
+            <div class="pure-u-1 pure-u-md-2-5">
+                <input type="text" name="file" value="{{.form.file}}" placeholder="File name (e.g. nginx.conf)" class="pure-input-1">
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <input type="text" name="path" value="{{.form.path}}" placeholder="Path (e.g. /etc)" class="pure-input-1">
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <input type="text" name="name" value="{{.form.name}}" placeholder="Package name" class="pure-input-1">
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <select name="branch" class="pure-input-1">
+                    {{range .branches}}<option value="{{.}}" {{if eq . $.form.branch}}selected{{end}}>{{.}}</option>{{end}}
+                </select>
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <select name="repo" class="pure-input-1">
+                    <option value="">All Repos</option>
+                    {{range .repos}}<option value="{{.}}" {{if eq . $.form.repo}}selected{{end}}>{{.}}</option>{{end}}
+                </select>
+            </div>
+            <div class="pure-u-1 pure-u-md-1-10">
+                <button type="submit" class="btn-primary pure-input-1">Search Files</button>
+            </div>
+        </div>
+    </form>
+</div>
 
-    <select name="repo">
-        <option value="">All Repos</option>
-        {{range .repos}}
-        <option value="{{.}}" {{if eq . $.form.repo}}selected{{end}}>{{.}}</option>
-        {{end}}
-    </select>
-
-    <select name="arch">
-        <option value="">All Arches</option>
-        {{range .arches}}
-        <option value="{{.}}" {{if eq . $.form.arch}}selected{{end}}>{{.}}</option>
-        {{end}}
-    </select>
-
-    <button type="submit">Search</button>
-</form>
+{{if gt .pages 1}}
+<div class="pagination">
+    {{if gt .form.page 1}}
+        <a href="?page={{add .form.page -1}}&file={{.form.file}}&path={{.form.path}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}" class="page-btn">&laquo; Prev</a>
+    {{end}}
+    {{range $p := seq .pag_start .pag_stop}}
+        {{if eq $p $.form.page}}<span class="page-btn active">{{$p}}</span>
+        {{else}}<a href="?page={{$p}}&file={{$.form.file}}&path={{$.form.path}}&name={{$.form.name}}&branch={{$.form.branch}}&repo={{$.form.repo}}&arch={{$.form.arch}}" class="page-btn">{{$p}}</a>{{end}}
+    {{end}}
+    {{if lt .form.page .pages}}
+        <a href="?page={{add .form.page 1}}&file={{.form.file}}&path={{.form.path}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}" class="page-btn">Next &raquo;</a>
+    {{end}}
+</div>
+{{end}}
 
 {{if .contents}}
 <table class="data-table">
     <thead>
-        <tr>
-            <th>File</th><th>Path</th><th>Package</th><th>Repo</th><th>Arch</th>
-        </tr>
+        <tr><th>File</th><th>Path</th><th>Package</th><th>Repo</th><th>Arch</th></tr>
     </thead>
     <tbody>
         {{range .contents}}
         <tr>
-            <td>{{.file}}</td>
-            <td>{{.path}}</td>
+            <td><code>{{.file}}</code></td>
+            <td><code>{{.path}}</code></td>
             <td><a href="/package/{{$.form.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></td>
             <td>{{.repo}}</td>
             <td>{{.arch}}</td>
@@ -49,29 +64,8 @@
         {{end}}
     </tbody>
 </table>
-
-{{if gt .pages 1}}
-<div class="pagination">
-    {{if gt .form.page 1}}
-        <a href="?page={{add .form.page -1}}&file={{.form.file}}&path={{.form.path}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}">&laquo; Prev</a>
-    {{end}}
-    
-    {{range $p := seq .pag_start .pag_stop}}
-        {{if eq $p $.form.page}}
-            <span class="current">{{$p}}</span>
-        {{else}}
-            <a href="?page={{$p}}&file={{$.form.file}}&path={{$.form.path}}&name={{$.form.name}}&branch={{$.form.branch}}&repo={{$.form.repo}}&arch={{$.form.arch}}">{{$p}}</a>
-        {{end}}
-    {{end}}
-
-    {{if lt .form.page .pages}}
-        <a href="?page={{add .form.page 1}}&file={{.form.file}}&path={{.form.path}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}">Next &raquo;</a>
-    {{end}}
-</div>
-{{end}}
-
 {{else}}
-<p>No files found matching your criteria.</p>
+<div class="empty-state">No files found matching your criteria.</div>
 {{end}}
 
 {{template "footer" .}}

@@ -3,8 +3,10 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
 	"path/filepath"
-	"strings"
+        "strings"
 	"sync"
 
 	_ "modernc.org/sqlite" // Pure Go SQLite driver
@@ -16,13 +18,35 @@ type Manager struct {
 }
 
 func Open(dbDir string, branches []string) (*Manager, error) {
+	// Ensure database directory exists
+	absDir, _ := filepath.Abs(dbDir)
+	log.Printf("Database directory resolved to: %s", absDir)
+	if err := os.MkdirAll(absDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create database directory %s: %w", absDir, err)
+	}
+
 	m := &Manager{connections: make(map[string]*sql.DB)}
 	for _, branch := range branches {
-		dbFile := filepath.Join(dbDir, fmt.Sprintf("aports-%s.db", branch))
+		dbFile := filepath.Join(absDir, fmt.Sprintf("aports-%s.db", branch))
+		
+		// Verify file exists
+		if _, err := os.Stat(dbFile); os.IsNotExist(err) {
+			log.Printf("⚠️  Database file not found: %s (Will be created empty on first write)", dbFile)
+		} else {
+			log.Printf("✅ Found database file: %s", dbFile)
+		}
+
 		conn, err := sql.Open("sqlite", dbFile)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to open %s: %w", dbFile, err)
 		}
+
+		// Immediately test the connection to catch permission/path errors early
+		if err := conn.Ping(); err != nil {
+			log.Printf("❌ Failed to ping database %s: %v", dbFile, err)
+			log.Println("   --> Ensure no other process (like apkbrowser-updater) is locking this file.")
+		}
+
 		// Optimize SQLite for read-heavy web workloads
 		conn.Exec("PRAGMA journal_mode=WAL;")
 		conn.Exec("PRAGMA cache_size=-20000;")
@@ -46,6 +70,7 @@ func (m *Manager) Close() {
 	}
 }
 
+// CreateTables initializes the SQLite schema based on the Python reference.
 func CreateTables(db *sql.DB) {
 	schema := []string{
 		`CREATE TABLE IF NOT EXISTS 'packages' (
@@ -63,7 +88,7 @@ func CreateTables(db *sql.DB) {
 			'origin' TEXT,
 			'maintainer' INTEGER,
 			'build_time' INTEGER,
-			'commit' TEXT,
+			"commit" TEXT,
 			'provider_priority' INTEGER,
 			'fid' INTEGER
 		)`,
@@ -123,15 +148,18 @@ func CreateTables(db *sql.DB) {
 	}
 
 	for _, sqlStr := range schema {
-		db.Exec(sqlStr)
+		_, err := db.Exec(sqlStr)
+		if err != nil {
+			log.Printf("⚠️  Schema execution warning: %v", err)
+		}
 	}
 }
 
+// EnsureMaintainerExists inserts a maintainer if they don't exist and returns their ID.
 func EnsureMaintainerExists(tx *sql.Tx, maintainer string) sql.NullInt64 {
 	name := maintainer
 	email := ""
 	
-	// Simple parseaddr equivalent: "Name <email>"
 	if idx := strings.Index(maintainer, "<"); idx != -1 {
 		name = strings.TrimSpace(maintainer[:idx])
 		email = strings.Trim(maintainer[idx:], "<> ")
@@ -155,7 +183,6 @@ func EnsureMaintainerExists(tx *sql.Tx, maintainer string) sql.NullInt64 {
 		return sql.NullInt64{Valid: false}
 	}
 	
-	// Safely fetch the ID since LastInsertId can be unreliable with INSERT OR REPLACE in some drivers
 	var selID int64
 	err = tx.QueryRow("SELECT id FROM maintainer WHERE name=? and email=?", name, email).Scan(&selID)
 	if err != nil {

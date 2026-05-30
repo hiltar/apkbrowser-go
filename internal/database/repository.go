@@ -46,13 +46,17 @@ func NewRepository(db *sql.DB) *Repository {
 
 // ensureFTS5 creates the virtual tables, sync triggers, and populates existing data.
 func (r *Repository) ensureFTS5() error {
+	// Ensure base tables exist
+	CreateTables(r.db)
+
 	// 1. Create FTS5 virtual tables
 	_, err := r.db.Exec(`
 		CREATE VIRTUAL TABLE IF NOT EXISTS packages_fts USING fts5(name, description, content=packages, content_rowid=id);
 		CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(file, path, content=files, content_rowid=id);
 	`)
 	if err != nil {
-		return fmt.Errorf("failed to create FTS5 tables: %w", err)
+		log.Printf("⚠️  FTS5 tables failed to create (search will fallback to GLOB): %v", err)
+		return nil // Graceful fallback, don't crash
 	}
 
 	// 2. Create triggers to keep packages_fts in sync automatically
@@ -69,7 +73,7 @@ func (r *Repository) ensureFTS5() error {
 		END;
 	`)
 	if err != nil {
-		return fmt.Errorf("failed to create packages triggers: %w", err)
+		log.Printf("⚠️  FTS5 packages triggers failed: %v", err)
 	}
 
 	// 3. Create triggers to keep files_fts in sync automatically
@@ -86,15 +90,15 @@ func (r *Repository) ensureFTS5() error {
 		END;
 	`)
 	if err != nil {
-		return fmt.Errorf("failed to create files triggers: %w", err)
+		log.Printf("⚠️  FTS5 files triggers failed: %v", err)
 	}
 
-	// 4. Rebuild the search index if the tables exist but are empty (first time migration)
+	// 4. Rebuild the search index if empty
 	var pkgCount, ftsPkgCount int
 	r.db.QueryRow("SELECT count(*) FROM packages").Scan(&pkgCount)
 	r.db.QueryRow("SELECT count(*) FROM packages_fts").Scan(&ftsPkgCount)
 	if pkgCount > 0 && ftsPkgCount == 0 {
-		log.Println("Populating packages FTS5 search index (this may take a moment on first run)...")
+		log.Println("🔨 Populating packages FTS5 search index (first run may take a moment)...")
 		r.db.Exec("INSERT INTO packages_fts(packages_fts) VALUES('rebuild')")
 	}
 
@@ -102,7 +106,7 @@ func (r *Repository) ensureFTS5() error {
 	r.db.QueryRow("SELECT count(*) FROM files").Scan(&fileCount)
 	r.db.QueryRow("SELECT count(*) FROM files_fts").Scan(&ftsFileCount)
 	if fileCount > 0 && ftsFileCount == 0 {
-		log.Println("Populating files FTS5 search index (this may take a moment on first run)...")
+		log.Println("🔨 Populating files FTS5 search index (first run may take a moment)...")
 		r.db.Exec("INSERT INTO files_fts(files_fts) VALUES('rebuild')")
 	}
 

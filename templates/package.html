@@ -1,88 +1,73 @@
 {{template "header" .}}
 
-<h2>Package: {{.pkg.name}}</h2>
-
-<div class="package-header">
-    <h3>{{.pkg.name}} ({{.pkg.version}})</h3>
-    <p class="description">{{.pkg.description}}</p>
-</div>
-
-<div class="package-details">
-    <table class="info-table">
-        <tr><th>Branch</th><td>{{.branch}}</td></tr>
-        <tr><th>Repo</th><td>{{.pkg.repo}}</td></tr>
-        <tr><th>Arch</th><td>{{.pkg.arch}}</td></tr>
-        <tr><th>Size</th><td>{{.pkg.size_fmt}}</td></tr>
-        <tr><th>Installed Size</th><td>{{.pkg.installed_size_fmt}}</td></tr>
-        <tr><th>License</th><td>{{.pkg.license}}</td></tr>
-        <tr><th>Maintainer</th><td>
-            {{if .pkg.mname}}
-                {{.pkg.mname}} &lt;{{.pkg.memail}}&gt;
-            {{else}}
-                Unknown
-            {{end}}
-        </td></tr>
-        <tr><th>Build Time</th><td>{{.pkg.build_time_fmt}}</td></tr>
-        <tr><th>Origin</th><td>{{.pkg.origin}}</td></tr>
-        {{if .pkg.url}}<tr><th>URL</th><td><a href="{{.pkg.url}}" target="_blank">{{.pkg.url}}</a></td></tr>{{end}}
-    </table>
-
-    <div class="external-links">
-        {{if .git_url}}<a href="{{.git_url}}" class="btn" target="_blank">Git Commit</a>{{end}}
-        {{if .repo_url}}<a href="{{.repo_url}}" class="btn" target="_blank">Git Repo</a>{{end}}
-        {{if .build_log_url}}<a href="{{.build_log_url}}" class="btn" target="_blank">Build Log</a>{{end}}
+<div style="background:#fff; padding:1.5rem; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:1.5rem;">
+    <h2 style="margin:0 0 0.5rem 0; display:flex; align-items:center; gap:0.75rem;">
+        {{.pkg.name}}
+        <span style="font-size:1rem; color:#718096; font-weight:400; background:#edf2f7; padding:0.2rem 0.6rem; border-radius:4px;">{{.pkg.version}}</span>
+    </h2>
+    <p style="color:#4a5568; margin:0 0 1rem 0; line-height:1.6;">{{.pkg.description}}</p>
+    
+    <div class="pure-g" style="gap: 1rem;">
+        <div class="pure-u-1 pure-u-md-2-3">
+            <table class="data-table" style="margin:0;">
+                <tbody>
+                    <tr><th width="18%">Branch</th><td>{{.branch}}</td></tr>
+                    <tr><th>Repository</th><td>{{.pkg.repo}}</td></tr>
+                    <tr><th>Architecture</th><td>{{.pkg.arch}}</td></tr>
+                    <tr><th>Package Size</th><td>{{.pkg.size_fmt}}</td></tr>
+                    <tr><th>Installed Size</th><td>{{.pkg.installed_size_fmt}}</td></tr>
+                    <tr><th>License</th><td><code>{{.pkg.license}}</code></td></tr>
+                    <tr><th>Maintainer</th><td>{{if .pkg.mname}}{{.pkg.mname}} &lt;{{.pkg.memail}}&gt;{{else}}<span style="color:#a0aec0;">Unknown</span>{{end}}</td></tr>
+                    <tr><th>Build Time</th><td>{{.pkg.build_time_fmt}}</td></tr>
+                    <tr><th>Origin</th><td><code>{{.pkg.origin}}</code></td></tr>
+                    <tr><th>Git Commit</th><td><code>{{if .pkg.commit}}{{.pkg.commit}}{{else}}N/A{{end}}</code></td></tr>
+                    {{if .pkg.url}}<tr><th>Upstream URL</th><td><a href="{{.pkg.url}}" target="_blank" rel="noopener">{{.pkg.url}}</a></td></tr>{{end}}
+                </tbody>
+            </table>
+        </div>
+        <div class="pure-u-1 pure-u-md-1-3" style="display:flex; flex-direction:column; gap:0.5rem;">
+            <h4 style="margin:0.5rem 0 0.25rem 0; color:#2d3748;">External Links</h4>
+            {{if .git_url}}<a href="{{.git_url}}" target="_blank" class="btn-primary" style="text-align:center;">🔍 View Git Commit</a>{{end}}
+            {{if .repo_url}}<a href="{{.repo_url}}" target="_blank" class="btn-primary" style="text-align:center; background:#4299e1;">📁 Git Repository</a>{{end}}
+            {{if .build_log_url}}<a href="{{.build_log_url}}" target="_blank" class="btn-primary" style="text-align:center; background:#48bb78;">📜 Build Log</a>{{end}}
+        </div>
     </div>
 </div>
 
-<div class="relations">
-    <div class="relation-block">
-        <h4>Dependencies ({{.num_depends}})</h4>
-        <ul>
-            {{range .depends}}
-            <li>
-                {{if .pkg_name}}
-                    <a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.pkg_name}}">{{.name}}</a>
-                {{else}}
-                    {{.name}} <span class="missing">(missing)</span>
-                {{end}}
-            </li>
-            {{else}}
-            <li>None</li>
-            {{end}}
-        </ul>
+<div class="pure-g" style="gap: 1.5rem;">
+    <div class="pure-u-1 pure-u-md-1-2">
+        <div style="background:#fff; padding:1.2rem; border-radius:8px; border:1px solid #e2e8f0;">
+            <h3 style="margin-top:0; border-bottom:1px solid #edf2f7; padding-bottom:0.5rem;">Dependencies ({{.num_depends}})</h3>
+            <ul style="padding-left:1.2rem; margin:0; line-height:1.8;">
+                {{range .depends}}
+                <li>{{if .pkg_name}}<a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.pkg_name}}">{{.name}}</a>{{else}}<span style="color:#e53e3e;">{{.name}} (missing)</span>{{end}}</li>
+                {{else}}<li style="color:#718096;">None</li>{{end}}
+            </ul>
+        </div>
     </div>
-
-    <div class="relation-block">
-        <h4>Required By ({{.num_required_by}})</h4>
-        <ul>
-            {{range .required_by}}
-            <li><a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></li>
-            {{else}}
-            <li>None</li>
-            {{end}}
-        </ul>
+    <div class="pure-u-1 pure-u-md-1-2">
+        <div style="background:#fff; padding:1.2rem; border-radius:8px; border:1px solid #e2e8f0;">
+            <h3 style="margin-top:0; border-bottom:1px solid #edf2f7; padding-bottom:0.5rem;">Required By ({{.num_required_by}})</h3>
+            <ul style="padding-left:1.2rem; margin:0; line-height:1.8;">
+                {{range .required_by}}<li><a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></li>{{else}}<li style="color:#718096;">None</li>{{end}}
+            </ul>
+        </div>
     </div>
-
-    <div class="relation-block">
-        <h4>Subpackages ({{.num_subpackages}})</h4>
-        <ul>
-            {{range .subpackages}}
-            <li><a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></li>
-            {{else}}
-            <li>None</li>
-            {{end}}
-        </ul>
+    <div class="pure-u-1 pure-u-md-1-2">
+        <div style="background:#fff; padding:1.2rem; border-radius:8px; border:1px solid #e2e8f0;">
+            <h3 style="margin-top:0; border-bottom:1px solid #edf2f7; padding-bottom:0.5rem;">Subpackages ({{.num_subpackages}})</h3>
+            <ul style="padding-left:1.2rem; margin:0; line-height:1.8;">
+                {{range .subpackages}}<li><a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></li>{{else}}<li style="color:#718096;">None</li>{{end}}
+            </ul>
+        </div>
     </div>
-
-    <div class="relation-block">
-        <h4>Provides ({{.num_provides}})</h4>
-        <ul>
-            {{range .provides}}
-            <li>{{.name}} {{if .operator}}{{.operator}} {{.version}}{{end}}</li>
-            {{else}}
-            <li>None</li>
-            {{end}}
-        </ul>
+    <div class="pure-u-1 pure-u-md-1-2">
+        <div style="background:#fff; padding:1.2rem; border-radius:8px; border:1px solid #e2e8f0;">
+            <h3 style="margin-top:0; border-bottom:1px solid #edf2f7; padding-bottom:0.5rem;">Provides ({{.num_provides}})</h3>
+            <ul style="padding-left:1.2rem; margin:0; line-height:1.8;">
+                {{range .provides}}<li><code>{{.name}}</code> {{if .operator}}<small style="color:#718096;">{{.operator}} {{.version}}</small>{{end}}</li>{{else}}<li style="color:#718096;">None</li>{{end}}
+            </ul>
+        </div>
     </div>
 </div>
 

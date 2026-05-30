@@ -2,38 +2,57 @@
 
 <h2>Package Index</h2>
 
-<form method="GET" action="/packages" class="search-form">
-    <input type="text" name="name" value="{{.form.name}}" placeholder="Package name (e.g. nginx or *ssl*)">
-    
-    <select name="branch">
-        {{range .branches}}
-        <option value="{{.}}" {{if eq . $.form.branch}}selected{{end}}>{{.}}</option>
-        {{end}}
-    </select>
+<div class="search-box">
+    <form method="GET" action="/packages" class="pure-form">
+        <div class="pure-g" style="gap: 1rem;">
+            <div class="pure-u-1 pure-u-md-2-5">
+                <input type="text" name="name" value="{{.form.name}}" placeholder="Search packages (e.g. nginx or *ssl*)" class="pure-input-1">
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <select name="branch" class="pure-input-1">
+                    {{range .branches}}<option value="{{.}}" {{if eq . $.form.branch}}selected{{end}}>{{.}}</option>{{end}}
+                </select>
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <select name="repo" class="pure-input-1">
+                    <option value="">All Repos</option>
+                    {{range .repos}}<option value="{{.}}" {{if eq . $.form.repo}}selected{{end}}>{{.}}</option>{{end}}
+                </select>
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <select name="arch" class="pure-input-1">
+                    <option value="">All Arches</option>
+                    {{range .arches}}<option value="{{.}}" {{if eq . $.form.arch}}selected{{end}}>{{.}}</option>{{end}}
+                </select>
+            </div>
+            <div class="pure-u-1-2 pure-u-md-1-10">
+                <select name="maintainer" class="pure-input-1">
+                    <option value="">All Maintainers</option>
+                    {{range .maintainers}}<option value="{{.}}" {{if eq . $.form.maintainer}}selected{{end}}>{{.}}</option>{{end}}
+                </select>
+            </div>
+            <div class="pure-u-1 pure-u-md-1-10">
+                <button type="submit" class="btn-primary pure-input-1">Search</button>
+            </div>
+        </div>
+    </form>
+</div>
 
-    <select name="repo">
-        <option value="">All Repos</option>
-        {{range .repos}}
-        <option value="{{.}}" {{if eq . $.form.repo}}selected{{end}}>{{.}}</option>
-        {{end}}
-    </select>
-
-    <select name="arch">
-        <option value="">All Arches</option>
-        {{range .arches}}
-        <option value="{{.}}" {{if eq . $.form.arch}}selected{{end}}>{{.}}</option>
-        {{end}}
-    </select>
-
-    <select name="maintainer">
-        <option value="">All Maintainers</option>
-        {{range .maintainers}}
-        <option value="{{.}}" {{if eq . $.form.maintainer}}selected{{end}}>{{.}}</option>
-        {{end}}
-    </select>
-
-    <button type="submit">Search</button>
-</form>
+<!-- Pagination moved directly below search -->
+{{if gt .pages 1}}
+<div class="pagination">
+    {{if gt .form.page 1}}
+        <a href="?page={{add .form.page -1}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}&maintainer={{.form.maintainer}}" class="page-btn">&laquo; Prev</a>
+    {{end}}
+    {{range $p := seq .pag_start .pag_stop}}
+        {{if eq $p $.form.page}}<span class="page-btn active">{{$p}}</span>
+        {{else}}<a href="?page={{$p}}&name={{$.form.name}}&branch={{$.form.branch}}&repo={{$.form.repo}}&arch={{$.form.arch}}&maintainer={{$.form.maintainer}}" class="page-btn">{{$p}}</a>{{end}}
+    {{end}}
+    {{if lt .form.page .pages}}
+        <a href="?page={{add .form.page 1}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}&maintainer={{.form.maintainer}}" class="page-btn">Next &raquo;</a>
+    {{end}}
+</div>
+{{end}}
 
 {{if .packages}}
 <table class="data-table">
@@ -46,44 +65,17 @@
         {{range .packages}}
         <tr>
             <td><a href="/package/{{$.form.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></td>
-            <td>{{.version}}</td>
+            <td><code>{{.version}}</code></td>
             <td>{{.repo}}</td>
             <td>{{.arch}}</td>
-            <td>
-                {{if .mname}}
-                    <a href="/packages?maintainer={{.mname}}&branch={{$.form.branch}}">{{.mname}}</a>
-                {{else}}
-                    Unknown
-                {{end}}
-            </td>
+            <td>{{if .mname}}<a href="/packages?maintainer={{.mname}}&branch={{$.form.branch}}">{{.mname}}</a>{{else}}<span style="color:#a0aec0;">Unknown</span>{{end}}</td>
             <td>{{.build_time_fmt}}</td>
         </tr>
         {{end}}
     </tbody>
 </table>
-
-{{if gt .pages 1}}
-<div class="pagination">
-    {{if gt .form.page 1}}
-        <a href="?page={{add .form.page -1}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}&maintainer={{.form.maintainer}}">&laquo; Prev</a>
-    {{end}}
-    
-    {{range $p := seq .pag_start .pag_stop}}
-        {{if eq $p $.form.page}}
-            <span class="current">{{$p}}</span>
-        {{else}}
-            <a href="?page={{$p}}&name={{$.form.name}}&branch={{$.form.branch}}&repo={{$.form.repo}}&arch={{$.form.arch}}&maintainer={{$.form.maintainer}}">{{$p}}</a>
-        {{end}}
-    {{end}}
-
-    {{if lt .form.page .pages}}
-        <a href="?page={{add .form.page 1}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}&maintainer={{.form.maintainer}}">Next &raquo;</a>
-    {{end}}
-</div>
-{{end}}
-
 {{else}}
-<p>No packages found matching your criteria.</p>
+<div class="empty-state">No packages found matching your criteria.</div>
 {{end}}
 
 {{template "footer" .}}
