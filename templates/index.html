@@ -1,0 +1,89 @@
+{{template "header" .}}
+
+<h2>Package Index</h2>
+
+<form method="GET" action="/packages" class="search-form">
+    <input type="text" name="name" value="{{.form.name}}" placeholder="Package name (e.g. nginx or *ssl*)">
+    
+    <select name="branch">
+        {{range .branches}}
+        <option value="{{.}}" {{if eq . $.form.branch}}selected{{end}}>{{.}}</option>
+        {{end}}
+    </select>
+
+    <select name="repo">
+        <option value="">All Repos</option>
+        {{range .repos}}
+        <option value="{{.}}" {{if eq . $.form.repo}}selected{{end}}>{{.}}</option>
+        {{end}}
+    </select>
+
+    <select name="arch">
+        <option value="">All Arches</option>
+        {{range .arches}}
+        <option value="{{.}}" {{if eq . $.form.arch}}selected{{end}}>{{.}}</option>
+        {{end}}
+    </select>
+
+    <select name="maintainer">
+        <option value="">All Maintainers</option>
+        {{range .maintainers}}
+        <option value="{{.}}" {{if eq . $.form.maintainer}}selected{{end}}>{{.}}</option>
+        {{end}}
+    </select>
+
+    <button type="submit">Search</button>
+</form>
+
+{{if .packages}}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th><th>Version</th><th>Repo</th><th>Arch</th><th>Maintainer</th><th>Build Time</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .packages}}
+        <tr>
+            <td><a href="/package/{{$.form.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></td>
+            <td>{{.version}}</td>
+            <td>{{.repo}}</td>
+            <td>{{.arch}}</td>
+            <td>
+                {{if .mname}}
+                    <a href="/packages?maintainer={{.mname}}&branch={{$.form.branch}}">{{.mname}}</a>
+                {{else}}
+                    Unknown
+                {{end}}
+            </td>
+            <td>{{.build_time_fmt}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+
+{{if gt .pages 1}}
+<div class="pagination">
+    {{if gt .form.page 1}}
+        <a href="?page={{add .form.page -1}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}&maintainer={{.form.maintainer}}">&laquo; Prev</a>
+    {{end}}
+    
+    {{range $p := seq .pag_start .pag_stop}}
+        {{if eq $p $.form.page}}
+            <span class="current">{{$p}}</span>
+        {{else}}
+            <a href="?page={{$p}}&name={{$.form.name}}&branch={{$.form.branch}}&repo={{$.form.repo}}&arch={{$.form.arch}}&maintainer={{$.form.maintainer}}">{{$p}}</a>
+        {{end}}
+    {{end}}
+
+    {{if lt .form.page .pages}}
+        <a href="?page={{add .form.page 1}}&name={{.form.name}}&branch={{.form.branch}}&repo={{.form.repo}}&arch={{.form.arch}}&maintainer={{.form.maintainer}}">Next &raquo;</a>
+    {{end}}
+</div>
+{{end}}
+
+{{else}}
+<p>No packages found matching your criteria.</p>
+{{end}}
+
+{{template "footer" .}}

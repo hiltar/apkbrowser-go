@@ -1,0 +1,89 @@
+{{template "header" .}}
+
+<h2>Package: {{.pkg.name}}</h2>
+
+<div class="package-header">
+    <h3>{{.pkg.name}} ({{.pkg.version}})</h3>
+    <p class="description">{{.pkg.description}}</p>
+</div>
+
+<div class="package-details">
+    <table class="info-table">
+        <tr><th>Branch</th><td>{{.branch}}</td></tr>
+        <tr><th>Repo</th><td>{{.pkg.repo}}</td></tr>
+        <tr><th>Arch</th><td>{{.pkg.arch}}</td></tr>
+        <tr><th>Size</th><td>{{.pkg.size_fmt}}</td></tr>
+        <tr><th>Installed Size</th><td>{{.pkg.installed_size_fmt}}</td></tr>
+        <tr><th>License</th><td>{{.pkg.license}}</td></tr>
+        <tr><th>Maintainer</th><td>
+            {{if .pkg.mname}}
+                {{.pkg.mname}} &lt;{{.pkg.memail}}&gt;
+            {{else}}
+                Unknown
+            {{end}}
+        </td></tr>
+        <tr><th>Build Time</th><td>{{.pkg.build_time_fmt}}</td></tr>
+        <tr><th>Origin</th><td>{{.pkg.origin}}</td></tr>
+        {{if .pkg.url}}<tr><th>URL</th><td><a href="{{.pkg.url}}" target="_blank">{{.pkg.url}}</a></td></tr>{{end}}
+    </table>
+
+    <div class="external-links">
+        {{if .git_url}}<a href="{{.git_url}}" class="btn" target="_blank">Git Commit</a>{{end}}
+        {{if .repo_url}}<a href="{{.repo_url}}" class="btn" target="_blank">Git Repo</a>{{end}}
+        {{if .build_log_url}}<a href="{{.build_log_url}}" class="btn" target="_blank">Build Log</a>{{end}}
+    </div>
+</div>
+
+<div class="relations">
+    <div class="relation-block">
+        <h4>Dependencies ({{.num_depends}})</h4>
+        <ul>
+            {{range .depends}}
+            <li>
+                {{if .pkg_name}}
+                    <a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.pkg_name}}">{{.name}}</a>
+                {{else}}
+                    {{.name}} <span class="missing">(missing)</span>
+                {{end}}
+            </li>
+            {{else}}
+            <li>None</li>
+            {{end}}
+        </ul>
+    </div>
+
+    <div class="relation-block">
+        <h4>Required By ({{.num_required_by}})</h4>
+        <ul>
+            {{range .required_by}}
+            <li><a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></li>
+            {{else}}
+            <li>None</li>
+            {{end}}
+        </ul>
+    </div>
+
+    <div class="relation-block">
+        <h4>Subpackages ({{.num_subpackages}})</h4>
+        <ul>
+            {{range .subpackages}}
+            <li><a href="/package/{{$.branch}}/{{.repo}}/{{.arch}}/{{.name}}">{{.name}}</a></li>
+            {{else}}
+            <li>None</li>
+            {{end}}
+        </ul>
+    </div>
+
+    <div class="relation-block">
+        <h4>Provides ({{.num_provides}})</h4>
+        <ul>
+            {{range .provides}}
+            <li>{{.name}} {{if .operator}}{{.operator}} {{.version}}{{end}}</li>
+            {{else}}
+            <li>None</li>
+            {{end}}
+        </ul>
+    </div>
+</div>
+
+{{template "footer" .}}

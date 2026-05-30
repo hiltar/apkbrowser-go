@@ -1,0 +1,25 @@
+{{define "header"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}} - {{.distro_name}}</title>
+    <link rel="icon" href="/static/img/{{.favicon}}" type="image/x-icon">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <img src="/static/img/{{.logo}}" alt="{{.distro_name}} Logo">
+            <h1>{{.distro_name}} Package Browser</h1>
+        </div>
+        <nav>
+            <a href="/packages">Packages</a>
+            <a href="/contents">Contents</a>
+            {{if .external_wiki}}<a href="{{.external_wiki}}" target="_blank">Wiki</a>{{end}}
+            {{if .external_mirrors}}<a href="{{.external_mirrors}}" target="_blank">Mirrors</a>{{end}}
+        </nav>
+    </header>
+    <main class="container">
+{{end}}
