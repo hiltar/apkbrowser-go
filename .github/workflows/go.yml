@@ -1,0 +1,68 @@
+name: apkbrowser-go
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Cache Go Modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
+    
+    - name: Tidy Modules
+      run: go mod init apkbrowser-go && go mod tidy && go mod verify
+
+    - name: Download and Install UPX
+      run: |
+        wget -q https://github.com/upx/upx/releases/download/v5.1.1/upx-5.1.1-amd64_linux.tar.xz
+        tar -xf upx-5.1.1-amd64_linux.tar.xz
+        chmod +x upx-5.1.1-amd64_linux/upx
+        cp upx-5.1.1-amd64_linux/upx /usr/local/bin/upx
+        rm -rf upx-*
+
+    - name: Build ARM64 (Raspberry Pi Zero 2W)
+      run: |
+        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+        go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
+        -o apkbrowser-arm .
+
+    - name: Build AMD64 (Generic/Server)
+      run: |
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+        go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
+        -o apkbrowser .
+
+    - name: Compress Binaries with UPX
+      run: |
+        upx --best --lzma apkbrowser-arm apkbrowser
+        ls -lh apkbrowser*
+
+    - name: Upload to GitHub Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          apkbrowser-arm
+          apkbrowser
+        draft: true
