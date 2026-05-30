@@ -58,7 +58,6 @@ jobs:
 
     - name: Build AMD64
       run: |
-        # FIX 2: Changed GOARCH=arm64 to amd64 for the updater binary
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
         go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
         -o updater ./cmd/updater
