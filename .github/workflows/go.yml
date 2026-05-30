@@ -41,28 +41,37 @@ jobs:
         cp upx-5.1.1-amd64_linux/upx /usr/local/bin/upx
         rm -rf upx-*
 
-    - name: Build ARM64 (Raspberry Pi Zero 2W)
+    - name: Build ARM64
       run: |
         CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
         go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
-        -o apkbrowser-arm .
+        -o updater-arm ./cmd/updater
 
-    - name: Build AMD64 (Generic/Server)
+        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+        go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
+        -o server-arm ./cmd/server
+
+    - name: Build AMD64
       run: |
+        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+        go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
+        -o updater ./cmd/updater
+
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
         go build -a -trimpath -ldflags="-s -w -extldflags '-static'" \
-        -o apkbrowser .
+        -o server ./cmd/server
 
     - name: Compress Binaries with UPX
       run: |
-        upx --best --lzma apkbrowser-arm apkbrowser
-        ls -lh apkbrowser*
+        upx --best --lzma updater server updater-arm server-arm
 
     - name: Upload to GitHub Release
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          apkbrowser-arm
-          apkbrowser
+          updater
+          server
+          updater-arm
+          server-arm
         draft: true
